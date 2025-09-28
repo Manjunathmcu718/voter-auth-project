@@ -12,6 +12,7 @@ from routes.auth_routes import auth_bp
 from routes.admin_routes import admin_bp
 from routes.data_routes import data_bp
 from routes.gov_verify_routes import gov_verify_bp
+from routes.image_routes import image_bp
 
 
 # Initialize Flask App
@@ -31,6 +32,7 @@ app.register_blueprint(auth_bp, url_prefix='/api/auth')
 app.register_blueprint(admin_bp, url_prefix='/api/admin')
 app.register_blueprint(data_bp, url_prefix='/api') # For dashboard and AI routes
 app.register_blueprint(gov_verify_bp, url_prefix='/api/auth')
+app.register_blueprint(image_bp, url_prefix='/api/admin')
 #Root Route 
 @app.route('/')
 def index():
