@@ -11,7 +11,7 @@ load_dotenv()
 from routes.auth_routes import auth_bp
 from routes.admin_routes import admin_bp
 from routes.data_routes import data_bp
-
+from routes.gov_verify_routes import gov_verify_bp
 
 
 # Initialize Flask App
@@ -30,7 +30,7 @@ app.mongo = mongo # Make mongo accessible in blueprints via current_app
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
 app.register_blueprint(admin_bp, url_prefix='/api/admin')
 app.register_blueprint(data_bp, url_prefix='/api') # For dashboard and AI routes
-
+app.register_blueprint(gov_verify_bp, url_prefix='/api/auth')
 #Root Route 
 @app.route('/')
 def index():
@@ -41,3 +41,5 @@ def index():
 if __name__ == '__main__':
     # Runs the Flask app in debug mode
     app.run(debug=True, host='0.0.0.0', port=5000)
+    # venv\Scripts\activate
+    # pip install -r requirements.txt
