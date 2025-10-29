@@ -13,10 +13,11 @@ from routes.admin_routes import admin_bp
 from routes.data_routes import data_bp
 from routes.gov_verify_routes import gov_verify_bp
 from routes.image_routes import image_bp
-
+from routes.booth_allocation import booth_allocation_bp
 
 # Initialize Flask App
 app = Flask(__name__)
+
 
 # --- Configuration ---
 app.config["MONGO_URI"] = os.getenv("MONGO_URI", "mongodb://localhost:27017/voter_auth_db")
@@ -33,6 +34,7 @@ app.register_blueprint(admin_bp, url_prefix='/api/admin')
 app.register_blueprint(data_bp, url_prefix='/api') # For dashboard and AI routes
 app.register_blueprint(gov_verify_bp, url_prefix='/api/auth')
 app.register_blueprint(image_bp, url_prefix='/api/admin')
+app.register_blueprint(booth_allocation_bp, url_prefix='/api/booth-allocation') 
 #Root Route 
 @app.route('/')
 def index():
