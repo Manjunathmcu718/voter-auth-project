@@ -1,5 +1,4 @@
-from flask import Blueprint, request, jsonify
-from database import db
+from flask import Blueprint, request, jsonify, current_app
 import re
 
 booth_allocation_bp = Blueprint('booth_allocation', __name__)
@@ -7,13 +6,14 @@ booth_allocation_bp = Blueprint('booth_allocation', __name__)
 # ============================================
 # 1. Create Locality-to-Booth Mapping
 # ============================================
-@booth_allocation_bp.route('/api/booth-allocation/create-mapping', methods=['POST'])
+@booth_allocation_bp.route('/create-mapping', methods=['POST'])  # ← Removed /api/booth-allocation/
 def create_mapping():
     """
     Create a new locality-to-booth mapping.
     Example: { "locality_names": ["Keshav Nagar", "Gandhi Nagar"], "booth_id": "BOOTH001" }
     """
     try:
+        db = current_app.mongo.db  # ← Fixed: Use current_app.mongo.db
         data = request.json
         locality_names = data.get('locality_names', [])
         booth_id = data.get('booth_id')
@@ -56,10 +56,11 @@ def create_mapping():
 # ============================================
 # 2. Get All Locality-Booth Mappings
 # ============================================
-@booth_allocation_bp.route('/api/booth-allocation/mappings', methods=['GET'])
+@booth_allocation_bp.route('/mappings', methods=['GET'])  # ← Removed /api/booth-allocation/
 def get_mappings():
     """Get all locality-to-booth mappings"""
     try:
+        db = current_app.mongo.db  # ← Fixed: Use current_app.mongo.db
         mappings = list(db.locality_booth_mapping.find())
         
         # Convert ObjectId to string
@@ -75,10 +76,11 @@ def get_mappings():
 # ============================================
 # 3. Delete a Mapping
 # ============================================
-@booth_allocation_bp.route('/api/booth-allocation/delete-mapping/<booth_id>', methods=['DELETE'])
+@booth_allocation_bp.route('/delete-mapping/<booth_id>', methods=['DELETE'])  # ← Removed /api/booth-allocation/
 def delete_mapping(booth_id):
     """Delete a locality-to-booth mapping"""
     try:
+        db = current_app.mongo.db  # ← Fixed: Use current_app.mongo.db
         result = db.locality_booth_mapping.delete_one({'booth_id': booth_id})
         
         if result.deleted_count > 0:
@@ -93,7 +95,7 @@ def delete_mapping(booth_id):
 # ============================================
 # 4. Auto-Allocate Booth Based on Address
 # ============================================
-@booth_allocation_bp.route('/api/booth-allocation/auto-allocate', methods=['POST'])
+@booth_allocation_bp.route('/auto-allocate', methods=['POST'])  # ← Removed /api/booth-allocation/
 def auto_allocate_booth():
     """
     Analyze an address and return the best matching booth.
@@ -101,6 +103,7 @@ def auto_allocate_booth():
     Returns: { "booth_id": "BOOTH001", "booth_name": "Central School", "matched_locality": "keshav nagar" }
     """
     try:
+        db = current_app.mongo.db  # ← Fixed: Use current_app.mongo.db
         data = request.json
         address = data.get('address', '').strip().lower()
         
@@ -131,13 +134,14 @@ def auto_allocate_booth():
         if best_match:
             return jsonify({
                 'success': True,
-                'allocation': best_match
+                'booth': best_match,  # ← Changed from 'allocation' to 'booth' for consistency
+                'message': f'Booth allocated based on locality: {best_match["matched_locality"]}'
             }), 200
         else:
             return jsonify({
                 'success': False,
-                'message': 'No matching booth found for this address',
-                'allocation': None
+                'message': 'No matching booth found for this address. Please assign manually.',
+                'booth': None
             }), 200
     
     except Exception as e:
@@ -147,13 +151,14 @@ def auto_allocate_booth():
 # ============================================
 # 5. Bulk Analyze Addresses
 # ============================================
-@booth_allocation_bp.route('/api/booth-allocation/bulk-analyze', methods=['POST'])
+@booth_allocation_bp.route('/bulk-analyze', methods=['POST'])  # ← Removed /api/booth-allocation/
 def bulk_analyze():
     """
     Analyze multiple addresses at once.
     Example: { "addresses": ["610/1119, Keshav Nagar, Delhi", "25A/2310, Gandhi Nagar, Delhi"] }
     """
     try:
+        db = current_app.mongo.db  # ← Fixed: Use current_app.mongo.db
         data = request.json
         addresses = data.get('addresses', [])
         
@@ -191,6 +196,30 @@ def bulk_analyze():
                 })
         
         return jsonify({'results': results}), 200
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================
+# 6. Get Booth Statistics
+# ============================================
+@booth_allocation_bp.route('/stats', methods=['GET'])
+def get_booth_stats():
+    """Get statistics about booth allocations"""
+    try:
+        db = current_app.mongo.db  # ← Fixed: Use current_app.mongo.db
+        
+        total_mappings = db.locality_booth_mapping.count_documents({})
+        
+        # Count total localities covered
+        all_mappings = list(db.locality_booth_mapping.find())
+        total_localities = sum(len(mapping['locality_names']) for mapping in all_mappings)
+        
+        return jsonify({
+            'total_booths_mapped': total_mappings,
+            'total_localities_covered': total_localities
+        }), 200
     
     except Exception as e:
         return jsonify({'error': str(e)}), 500
