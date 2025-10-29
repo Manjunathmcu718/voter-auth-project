@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { UserPlus, X } from 'lucide-react';
+import { UserPlus, X, MapPin, Sparkles, CheckCircle } from 'lucide-react';
 import ImageUpload from './ImageUpload';
+import axios from 'axios';
 
 const AddVoterForm = ({ onSubmit, onCancel }) => {
     const [formData, setFormData] = useState({
@@ -18,9 +19,20 @@ const AddVoterForm = ({ onSubmit, onCancel }) => {
     // New state for handling image data
     const [imageData, setImageData] = useState(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    
+    // NEW: State for Smart Booth Allocation
+    const [isAllocating, setIsAllocating] = useState(false);
+    const [allocationResult, setAllocationResult] = useState(null);
+    const [allocationError, setAllocationError] = useState('');
 
     const handleInputChange = (field, value) => {
         setFormData(prev => ({ ...prev, [field]: value }));
+        
+        // Clear allocation result when address changes
+        if (field === 'address') {
+            setAllocationResult(null);
+            setAllocationError('');
+        }
     };
 
     // Handle image data from ImageUpload component
@@ -28,14 +40,57 @@ const AddVoterForm = ({ onSubmit, onCancel }) => {
         setImageData(base64Data);
     };
 
+    // NEW: Smart Booth Allocation Function
+    const handleSmartAllocate = async () => {
+        if (!formData.address.trim()) {
+            setAllocationError('Please enter an address first');
+            return;
+        }
+
+        setIsAllocating(true);
+        setAllocationError('');
+        setAllocationResult(null);
+
+        try {
+            const response = await axios.post('http://localhost:5000/api/booth-allocation/auto-allocate', {
+                address: formData.address
+            });
+
+            if (response.data.success && response.data.booth) {
+                setAllocationResult(response.data.booth);
+                // Auto-fill the polling station field
+                setFormData(prev => ({
+                    ...prev,
+                    polling_station: response.data.booth.booth_name
+                }));
+            } else {
+                setAllocationError(response.data.message || 'No matching booth found for this address');
+            }
+        } catch (error) {
+            setAllocationError(error.response?.data?.error || 'Failed to allocate booth. Please try again.');
+        }
+
+        setIsAllocating(false);
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setIsSubmitting(true);
         
         try {
+            // Calculate age
+            const birthDate = new Date(formData.date_of_birth);
+            const today = new Date();
+            let age = today.getFullYear() - birthDate.getFullYear();
+            const m = today.getMonth() - birthDate.getMonth();
+            if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+                age--;
+            }
+
             // Create the submission data
             const submissionData = {
                 ...formData,
+                age,
                 image: imageData // Include image data if available
             };
             
@@ -166,36 +221,111 @@ const AddVoterForm = ({ onSubmit, onCancel }) => {
                         </div>
                     </div>
 
-                    {/* Address and Polling Station */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <label htmlFor="address" className="block text-sm font-medium text-gray-700">
-                                Full Address *
-                            </label>
-                            <textarea
-                                id="address"
-                                value={formData.address}
-                                onChange={(e) => handleInputChange('address', e.target.value)}
-                                required
-                                rows="3"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                placeholder="Enter complete residential address"
-                            />
-                        </div>
+                    {/* Address Section with Smart Allocation */}
+                    <div className="border-t border-gray-200 pt-6">
+                        <h4 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                            <MapPin className="w-5 h-5 text-blue-600" />
+                            Address & Booth Allocation
+                        </h4>
+                        
+                        <div className="space-y-4">
+                            {/* Address Input */}
+                            <div className="space-y-2">
+                                <label htmlFor="address" className="block text-sm font-medium text-gray-700">
+                                    Full Address *
+                                </label>
+                                <textarea
+                                    id="address"
+                                    value={formData.address}
+                                    onChange={(e) => handleInputChange('address', e.target.value)}
+                                    required
+                                    rows="3"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    placeholder="E.g., 610/1119, Keshav Nagar, Delhi - 110051"
+                                />
+                                <p className="text-xs text-gray-500">
+                                    💡 Enter complete address including locality name for smart booth allocation
+                                </p>
+                            </div>
 
-                        <div className="space-y-2">
-                            <label htmlFor="polling_station" className="block text-sm font-medium text-gray-700">
-                                Polling Station *
-                            </label>
-                            <input
-                                id="polling_station"
-                                type="text"
-                                value={formData.polling_station}
-                                onChange={(e) => handleInputChange('polling_station', e.target.value)}
-                                required
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                placeholder="Enter polling station name"
-                            />
+                            {/* Smart Allocate Button */}
+                            <button
+                                type="button"
+                                onClick={handleSmartAllocate}
+                                disabled={isAllocating || !formData.address.trim()}
+                                className="w-full md:w-auto px-6 py-2.5 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-md"
+                            >
+                                {isAllocating ? (
+                                    <>
+                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                        Analyzing Address...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Sparkles className="w-4 h-4" />
+                                        Smart Allocate Booth
+                                    </>
+                                )}
+                            </button>
+
+                            {/* Allocation Result */}
+                            {allocationResult && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: -10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className="bg-green-50 border border-green-200 rounded-lg p-4"
+                                >
+                                    <div className="flex items-start gap-3">
+                                        <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />
+                                        <div className="flex-1">
+                                            <h5 className="font-semibold text-green-800 mb-1">
+                                                Booth Allocated Successfully!
+                                            </h5>
+                                            <p className="text-sm text-green-700">
+                                                <strong>Booth:</strong> {allocationResult.booth_name}
+                                            </p>
+                                            <p className="text-sm text-green-700">
+                                                <strong>Matched Locality:</strong> {allocationResult.matched_locality}
+                                            </p>
+                                            <p className="text-xs text-green-600 mt-2">
+                                                ✓ Polling station field has been auto-filled
+                                            </p>
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            )}
+
+                            {/* Allocation Error */}
+                            {allocationError && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: -10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className="bg-yellow-50 border border-yellow-200 rounded-lg p-4"
+                                >
+                                    <p className="text-sm text-yellow-800">
+                                        ⚠️ {allocationError}
+                                    </p>
+                                    <p className="text-xs text-yellow-700 mt-1">
+                                        Please enter the polling station manually or create a locality mapping first.
+                                    </p>
+                                </motion.div>
+                            )}
+
+                            {/* Polling Station Input */}
+                            <div className="space-y-2">
+                                <label htmlFor="polling_station" className="block text-sm font-medium text-gray-700">
+                                    Polling Station *
+                                </label>
+                                <input
+                                    id="polling_station"
+                                    type="text"
+                                    value={formData.polling_station}
+                                    onChange={(e) => handleInputChange('polling_station', e.target.value)}
+                                    required
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    placeholder="Will be auto-filled or enter manually"
+                                />
+                            </div>
                         </div>
                     </div>
 
@@ -231,555 +361,3 @@ const AddVoterForm = ({ onSubmit, onCancel }) => {
 };
 
 export default AddVoterForm;
-// import React, { useState } from 'react';
-// import { motion } from 'framer-motion';
-// import { UserPlus, X } from 'lucide-react';
-// import ImageUpload from '../voter/ImageUpload';
-
-// export default function AddVoterForm({ onSubmit, onCancel }) {
-//   const [formData, setFormData] = useState({
-//     voter_id: '',
-//     aadhar_number: '',
-//     phone_number: '',
-//     full_name: '',
-//     date_of_birth: '',
-//     address: '',
-//     constituency: '',
-//     polling_station: '',
-//     image: null // Add image field
-//   });
-
-//   const [isSubmitting, setIsSubmitting] = useState(false);
-
-//   const handleSubmit = async (e) => {
-//     e.preventDefault();
-//     setIsSubmitting(true);
-
-//     try {
-//       // Calculate age
-//       const birthDate = new Date(formData.date_of_birth);
-//       const today = new Date();
-//       let age = today.getFullYear() - birthDate.getFullYear();
-//       const m = today.getMonth() - birthDate.getMonth();
-//       if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-//         age--;
-//       }
-
-//       const voterData = { ...formData, age };
-//       await onSubmit(voterData);
-//     } catch (error) {
-//       console.error('Error submitting voter:', error);
-//     }
-    
-//     setIsSubmitting(false);
-//   };
-
-//   const handleInputChange = (field, value) => {
-//     setFormData(prev => ({ ...prev, [field]: value }));
-//   };
-
-//   const handleImageUpload = (imageData) => {
-//     setFormData(prev => ({ ...prev, image: imageData }));
-//   };
-
-//   return (
-//     <motion.div
-//       initial={{ opacity: 0, y: -20 }}
-//       animate={{ opacity: 1, y: 0 }}
-//       exit={{ opacity: 0, y: -20, height: 0 }}
-//       className="mb-8 overflow-hidden"
-//     >
-//       <div className="shadow-xl border-0 bg-white/95 backdrop-blur-sm rounded-xl">
-//         <div className="flex flex-row items-center justify-between p-6 border-b border-gray-200">
-//           <div className="flex items-center gap-2">
-//             <UserPlus className="w-5 h-5 text-orange-600" />
-//             <h3 className="text-xl font-semibold">Add New Voter</h3>
-//           </div>
-//           <button 
-//             onClick={onCancel}
-//             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-//           >
-//             <X className="w-4 h-4" />
-//           </button>
-//         </div>
-        
-//         <div className="p-6">
-//           <form onSubmit={handleSubmit} className="space-y-6">
-//             {/* Basic Information */}
-//             <div>
-//               <h4 className="text-lg font-medium text-gray-800 mb-4">Personal Information</h4>
-//               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-//                 <div className="space-y-1">
-//                   <label className="block text-sm font-medium text-gray-700">Full Name *</label>
-//                   <input
-//                     type="text"
-//                     value={formData.full_name}
-//                     onChange={(e) => handleInputChange('full_name', e.target.value)}
-//                     required
-//                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-//                   />
-//                 </div>
-                
-//                 <div className="space-y-1">
-//                   <label className="block text-sm font-medium text-gray-700">Voter ID *</label>
-//                   <input
-//                     type="text"
-//                     value={formData.voter_id}
-//                     onChange={(e) => handleInputChange('voter_id', e.target.value)}
-//                     required
-//                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-//                   />
-//                 </div>
-                
-//                 <div className="space-y-1">
-//                   <label className="block text-sm font-medium text-gray-700">Aadhaar Number *</label>
-//                   <input
-//                     type="text"
-//                     value={formData.aadhar_number}
-//                     onChange={(e) => handleInputChange('aadhar_number', e.target.value)}
-//                     maxLength={12}
-//                     required
-//                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-//                   />
-//                 </div>
-                
-//                 <div className="space-y-1">
-//                   <label className="block text-sm font-medium text-gray-700">Mobile Number *</label>
-//                   <input
-//                     type="tel"
-//                     value={formData.phone_number}
-//                     onChange={(e) => handleInputChange('phone_number', e.target.value)}
-//                     maxLength={10}
-//                     required
-//                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-//                   />
-//                 </div>
-                
-//                 <div className="space-y-1">
-//                   <label className="block text-sm font-medium text-gray-700">Date of Birth *</label>
-//                   <input
-//                     type="date"
-//                     value={formData.date_of_birth}
-//                     onChange={(e) => handleInputChange('date_of_birth', e.target.value)}
-//                     required
-//                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-//                   />
-//                 </div>
-                
-//                 <div className="space-y-1 md:col-span-2 lg:col-span-1">
-//                   <label className="block text-sm font-medium text-gray-700">Full Address *</label>
-//                   <input
-//                     type="text"
-//                     value={formData.address}
-//                     onChange={(e) => handleInputChange('address', e.target.value)}
-//                     required
-//                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-//                   />
-//                 </div>
-//               </div>
-//             </div>
-
-//             {/* Electoral Information */}
-//             <div>
-//               <h4 className="text-lg font-medium text-gray-800 mb-4">Electoral Information</h4>
-//               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-//                 <div className="space-y-1">
-//                   <label className="block text-sm font-medium text-gray-700">Constituency *</label>
-//                   <input
-//                     type="text"
-//                     value={formData.constituency}
-//                     onChange={(e) => handleInputChange('constituency', e.target.value)}
-//                     required
-//                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-//                   />
-//                 </div>
-                
-//                 <div className="space-y-1">
-//                   <label className="block text-sm font-medium text-gray-700">Polling Station *</label>
-//                   <input
-//                     type="text"
-//                     value={formData.polling_station}
-//                     onChange={(e) => handleInputChange('polling_station', e.target.value)}
-//                     required
-//                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-//                   />
-//                 </div>
-//               </div>
-//             </div>
-
-//             {/* Photo Upload Section */}
-//             <div>
-//               <h4 className="text-lg font-medium text-gray-800 mb-4">Voter Photo</h4>
-//               <ImageUpload 
-//                 onImageUpload={handleImageUpload}
-//                 existingImage={formData.image}
-//               />
-//             </div>
-
-//             {/* Submit Buttons */}
-//             <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-//               <button
-//                 type="button"
-//                 onClick={onCancel}
-//                 className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
-//               >
-//                 Cancel
-//               </button>
-//               <button
-//                 type="submit"
-//                 disabled={isSubmitting}
-//                 className="px-6 py-2 bg-gradient-to-r from-orange-500 to-green-500 text-white rounded-md hover:from-orange-600 hover:to-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-//               >
-//                 {isSubmitting ? 'Adding Voter...' : 'Add Voter'}
-//               </button>
-//             </div>
-//           </form>
-//         </div>
-//       </div>
-//     </motion.div>
-//   );
-// }
-// // import React, { useState } from 'react';
-// // import { motion } from 'framer-motion';
-// // import { UserPlus, X } from 'lucide-react';
-
-// // const AddVoterForm = ({ booths, onSubmit, onCancel }) => {
-// //     // CHANGE 1: Added 'address' to the form's state
-// //     const [formData, setFormData] = useState({
-// //         voter_id: '',
-// //         aadhar_number: '',
-// //         phone_number: '',
-// //         full_name: '',
-// //         date_of_birth: '',
-// //         address: '', // <-- NEW
-// //         constituency: '',
-// //         polling_station: '',
-// //     });
-
-// //     // CHANGE 2: Updated handleSubmit to calculate age before sending
-// //     const handleSubmit = (e) => {
-// //         e.preventDefault();
-        
-// //         // Calculate age from date of birth
-// //         const birthDate = new Date(formData.date_of_birth);
-// //         const today = new Date();
-// //         let age = today.getFullYear() - birthDate.getFullYear();
-// //         const m = today.getMonth() - birthDate.getMonth();
-// //         if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-// //             age--;
-// //         }
-
-// //         // Send all form data PLUS the calculated age
-// //         onSubmit({ ...formData, age });
-// //     };
-
-// //     const handleInputChange = (field, value) => {
-// //         setFormData(prev => ({ ...prev, [field]: value }));
-// //     };
-
-// //     return (
-// //         <motion.div
-// //             initial={{ opacity: 0, y: -20 }}
-// //             animate={{ opacity: 1, y: 0 }}
-// //             exit={{ opacity: 0, y: -20 }}
-// //             className="mb-8"
-// //         >
-// //             <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-// //                 <div className="flex items-center justify-between mb-6">
-// //                     <h3 className="text-lg font-semibold flex items-center gap-2">
-// //                         <UserPlus className="w-5 h-5 text-saffron" />
-// //                         Add New Voter
-// //                     </h3>
-// //                     <button
-// //                         onClick={onCancel}
-// //                         className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-// //                     >
-// //                         <X className="w-4 h-4" />
-// //                     </button>
-// //                 </div>
-
-// //                 <form onSubmit={handleSubmit} className="space-y-4">
-// //                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-// //                         <div>
-// //                             <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-// //                             <input
-// //                                 type="text"
-// //                                 value={formData.full_name}
-// //                                 onChange={(e) => handleInputChange('full_name', e.target.value)}
-// //                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-// //                                 required
-// //                             />
-// //                         </div>
-
-// //                         <div>
-// //                             <label className="block text-sm font-medium text-gray-700 mb-1">Voter ID</label>
-// //                             <input
-// //                                 type="text"
-// //                                 value={formData.voter_id}
-// //                                 onChange={(e) => handleInputChange('voter_id', e.target.value)}
-// //                                 placeholder="ABC1234567"
-// //                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-// //                                 required
-// //                             />
-// //                         </div>
-
-// //                         <div>
-// //                             <label className="block text-sm font-medium text-gray-700 mb-1">Aadhaar Number</label>
-// //                             <input
-// //                                 type="text"
-// //                                 value={formData.aadhar_number}
-// //                                 onChange={(e) => handleInputChange('aadhar_number', e.target.value)}
-// //                                 maxLength={12}
-// //                                 placeholder="123456789012"
-// //                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-// //                                 required
-// //                             />
-// //                         </div>
-
-// //                         <div>
-// //                             <label className="block text-sm font-medium text-gray-700 mb-1">Mobile Number</label>
-// //                             <input
-// //                                 type="text"
-// //                                 value={formData.phone_number}
-// //                                 onChange={(e) => handleInputChange('phone_number', e.target.value)}
-// //                                 maxLength={10}
-// //                                 placeholder="9876543210"
-// //                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-// //                                 required
-// //                             />
-// //                         </div>
-
-// //                         <div>
-// //                             <label className="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
-// //                             <input
-// //                                 type="date"
-// //                                 value={formData.date_of_birth}
-// //                                 onChange={(e) => handleInputChange('date_of_birth', e.target.value)}
-// //                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-// //                                 required
-// //                             />
-// //                         </div>
-
-// //                         {/* CHANGE 3: Added the new input field for Address */}
-// //                         <div>
-// //                             <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
-// //                             <input
-// //                                 type="text"
-// //                                 value={formData.address}
-// //                                 onChange={(e) => handleInputChange('address', e.target.value)}
-// //                                 placeholder="Enter full address"
-// //                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-// //                                 required
-// //                             />
-// //                         </div>
-// //                         {/* END OF NEW FIELD */}
-
-// //                         <div>
-// //                             <label className="block text-sm font-medium text-gray-700 mb-1">Constituency</label>
-// //                             <input
-// //                                 type="text"
-// //                                 value={formData.constituency}
-// //                                 onChange={(e) => handleInputChange('constituency', e.target.value)}
-// //                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-// //                                 required
-// //                             />
-// //                         </div>
-
-// //                         <div className="md:col-span-2 lg:col-span-1">
-// //                             <label className="block text-sm font-medium text-gray-700 mb-1">Polling Station</label>
-// //                             <select
-// //                                 value={formData.polling_station}
-// //                                 onChange={(e) => handleInputChange('polling_station', e.target.value)}
-// //                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-// //                                 required
-// //                             >
-// //                                 <option value="">Select Booth</option>
-// //                                 {booths.map(booth => (
-// //                                     <option key={booth._id} value={booth.booth_name}>
-// //                                         {booth.booth_name} - {booth.constituency}
-// //                                     </option>
-// //                                 ))}
-// //                             </select>
-// //                         </div>
-// //                     </div>
-
-// //                     <div className="flex justify-end gap-3 pt-4">
-// //                         <button
-// //                             type="button"
-// //                             onClick={onCancel}
-// //                             className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-// //                         >
-// //                             Cancel
-// //                         </button>
-// //                         <button
-// //                             type="submit"
-// //                             className="px-4 py-2 bg-gradient-to-r from-saffron to-green text-white rounded-lg hover:shadow-lg transition-all duration-200"
-// //                         >
-// //                             Add Voter
-// //                         </button>
-// //                     </div>
-// //                 </form>
-// //             </div>
-// //         </motion.div>
-// //     );
-// // };
-
-// // export default AddVoterForm;
-// // // import React, { useState } from 'react';
-// // // import { motion } from 'framer-motion';
-// // // import { UserPlus, X } from 'lucide-react';
-
-// // // const AddVoterForm = ({ booths, onSubmit, onCancel }) => {
-// // //     const [formData, setFormData] = useState({
-// // //         voter_id: '',
-// // //         aadhar_number: '',
-// // //         phone_number: '',
-// // //         full_name: '',
-// // //         date_of_birth: '',
-// // //         constituency: '',
-// // //         polling_station: '',
-// // //     });
-
-// // //     const handleSubmit = (e) => {
-// // //         e.preventDefault();
-// // //         onSubmit(formData);
-// // //     };
-
-// // //     const handleInputChange = (field, value) => {
-// // //         setFormData(prev => ({ ...prev, [field]: value }));
-// // //     };
-
-// // //     return (
-// // //         <motion.div
-// // //             initial={{ opacity: 0, y: -20 }}
-// // //             animate={{ opacity: 1, y: 0 }}
-// // //             exit={{ opacity: 0, y: -20 }}
-// // //             className="mb-8"
-// // //         >
-// // //             <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-// // //                 <div className="flex items-center justify-between mb-6">
-// // //                     <h3 className="text-lg font-semibold flex items-center gap-2">
-// // //                         <UserPlus className="w-5 h-5 text-saffron" />
-// // //                         Add New Voter
-// // //                     </h3>
-// // //                     <button
-// // //                         onClick={onCancel}
-// // //                         className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-// // //                     >
-// // //                         <X className="w-4 h-4" />
-// // //                     </button>
-// // //                 </div>
-
-// // //                 <form onSubmit={handleSubmit} className="space-y-4">
-// // //                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-// // //                         <div>
-// // //                             <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-// // //                             <input
-// // //                                 type="text"
-// // //                                 value={formData.full_name}
-// // //                                 onChange={(e) => handleInputChange('full_name', e.target.value)}
-// // //                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-// // //                                 required
-// // //                             />
-// // //                         </div>
-
-// // //                         <div>
-// // //                             <label className="block text-sm font-medium text-gray-700 mb-1">Voter ID</label>
-// // //                             <input
-// // //                                 type="text"
-// // //                                 value={formData.voter_id}
-// // //                                 onChange={(e) => handleInputChange('voter_id', e.target.value)}
-// // //                                 placeholder="ABC1234567"
-// // //                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-// // //                                 required
-// // //                             />
-// // //                         </div>
-
-// // //                         <div>
-// // //                             <label className="block text-sm font-medium text-gray-700 mb-1">Aadhaar Number</label>
-// // //                             <input
-// // //                                 type="text"
-// // //                                 value={formData.aadhar_number}
-// // //                                 onChange={(e) => handleInputChange('aadhar_number', e.target.value)}
-// // //                                 maxLength={12}
-// // //                                 placeholder="123456789012"
-// // //                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-// // //                                 required
-// // //                             />
-// // //                         </div>
-
-// // //                         <div>
-// // //                             <label className="block text-sm font-medium text-gray-700 mb-1">Mobile Number</label>
-// // //                             <input
-// // //                                 type="text"
-// // //                                 value={formData.phone_number}
-// // //                                 onChange={(e) => handleInputChange('phone_number', e.target.value)}
-// // //                                 maxLength={10}
-// // //                                 placeholder="9876543210"
-// // //                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-// // //                                 required
-// // //                             />
-// // //                         </div>
-
-// // //                         <div>
-// // //                             <label className="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
-// // //                             <input
-// // //                                 type="date"
-// // //                                 value={formData.date_of_birth}
-// // //                                 onChange={(e) => handleInputChange('date_of_birth', e.target.value)}
-// // //                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-// // //                                 required
-// // //                             />
-// // //                         </div>
-
-// // //                         <div>
-// // //                             <label className="block text-sm font-medium text-gray-700 mb-1">Constituency</label>
-// // //                             <input
-// // //                                 type="text"
-// // //                                 value={formData.constituency}
-// // //                                 onChange={(e) => handleInputChange('constituency', e.target.value)}
-// // //                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-// // //                                 required
-// // //                             />
-// // //                         </div>
-
-// // //                         <div className="md:col-span-2 lg:col-span-1">
-// // //                             <label className="block text-sm font-medium text-gray-700 mb-1">Polling Station</label>
-// // //                             <select
-// // //                                 value={formData.polling_station}
-// // //                                 onChange={(e) => handleInputChange('polling_station', e.target.value)}
-// // //                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-// // //                                 required
-// // //                             >
-// // //                                 <option value="">Select Booth</option>
-// // //                                 {booths.map(booth => (
-// // //                                     <option key={booth._id} value={booth.booth_name}>
-// // //                                         {booth.booth_name} - {booth.constituency}
-// // //                                     </option>
-// // //                                 ))}
-// // //                             </select>
-// // //                         </div>
-// // //                     </div>
-
-// // //                     <div className="flex justify-end gap-3 pt-4">
-// // //                         <button
-// // //                             type="button"
-// // //                             onClick={onCancel}
-// // //                             className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-// // //                         >
-// // //                             Cancel
-// // //                         </button>
-// // //                         <button
-// // //                             type="submit"
-// // //                             className="px-4 py-2 bg-gradient-to-r from-saffron to-green text-white rounded-lg hover:shadow-lg transition-all duration-200"
-// // //                         >
-// // //                             Add Voter
-// // //                         </button>
-// // //                     </div>
-// // //                 </form>
-// // //             </div>
-// // //         </motion.div>
-// // //     );
-// // // };
-
-// // // export default AddVoterForm;
