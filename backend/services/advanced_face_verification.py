@@ -125,3 +125,4 @@ class AdvancedFaceVerification:
                 'reason': f'Face not detected: {str(e)}',
                 'detailed_scores': None
             }
+        # //pip install deepface tensorflow
