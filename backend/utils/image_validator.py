@@ -111,7 +111,7 @@ class VoterImageValidator:
                 
                 # Check if image is significantly tilted
                 avg_angle = np.mean(angles)
-                if abs(avg_angle - 90) > 15 and abs(avg_angle - 0) > 15:
+                if abs(avg_angle - 90) > 30 and abs(avg_angle - 0) > 30:
                     return {"valid": False, "error": "Image appears to be tilted. Please upload a straight image."}
             
             return {"valid": True}
