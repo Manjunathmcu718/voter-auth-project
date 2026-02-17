@@ -126,3 +126,4 @@ class AdvancedFaceVerification:
                 'detailed_scores': None
             }
         # //pip install deepface tensorflow
+        # advanced_face verification
