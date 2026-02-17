@@ -4,6 +4,7 @@ from deepface import DeepFace
 import base64
 from io import BytesIO
 from PIL import Image
+import requests
 
 class AdvancedFaceVerification:
     def __init__(self):
@@ -13,15 +14,12 @@ class AdvancedFaceVerification:
         """Detect photo/screen spoofing"""
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         
-        # Screen glare detection
         _, thresh = cv2.threshold(gray, 245, 255, cv2.THRESH_BINARY)
         glare_ratio = np.sum(thresh == 255) / (image.shape[0] * image.shape[1])
         
-        # Texture analysis
         laplacian = cv2.Laplacian(gray, cv2.CV_64F)
         texture_variance = laplacian.var()
         
-        # Edge analysis
         edges = cv2.Canny(gray, 50, 150)
         edge_density = np.sum(edges > 0) / (image.shape[0] * image.shape[1])
         
@@ -46,8 +44,14 @@ class AdvancedFaceVerification:
             'indicators': spoof_indicators
         }
     
-    def comprehensive_verification(self, stored_image_path, live_image_base64):
+    def comprehensive_verification(self, stored_image_url, live_image_base64):
         """Complete verification with DeepFace"""
+        
+        # Download stored image from URL
+        print(f"📥 Downloading stored image from: {stored_image_url}")
+        response = requests.get(stored_image_url)
+        stored_img = Image.open(BytesIO(response.content))
+        stored_cv = cv2.cvtColor(np.array(stored_img), cv2.COLOR_RGB2BGR)
         
         # Decode live image
         if 'base64,' in live_image_base64:
@@ -55,21 +59,18 @@ class AdvancedFaceVerification:
         
         live_image_bytes = base64.b64decode(live_image_base64)
         live_img = Image.open(BytesIO(live_image_bytes))
-        live_img = np.array(live_img)
-        live_cv = cv2.cvtColor(live_img, cv2.COLOR_RGB2BGR)
+        live_cv = cv2.cvtColor(np.array(live_img), cv2.COLOR_RGB2BGR)
         
-        # Anti-spoof detection
+        print("🔍 Running anti-spoof detection...")
         spoof_result = self.detect_anti_spoof(live_cv)
         
         if not spoof_result['is_real']:
+            print("❌ Spoofing detected!")
             return {
                 'match': False,
                 'confidence': 0,
                 'reason': 'Spoofing detected: ' + ', '.join(spoof_result['indicators']),
                 'detailed_scores': {
-                    'face_embedding_score': 'N/A',
-                    'geometry_score': 'N/A',
-                    'liveness_score': 'FAILED ✗',
                     'anti_spoof_score': f"{spoof_result['confidence']:.1f}%",
                     'final_confidence': '0%'
                 }
@@ -77,22 +78,19 @@ class AdvancedFaceVerification:
         
         # Face verification with DeepFace
         try:
+            print("🤖 Running DeepFace verification...")
             result = DeepFace.verify(
-                stored_image_path, 
+                stored_cv, 
                 live_cv,
                 model_name='Facenet',
                 enforce_detection=True
             )
             
-            # Calculate scores
             distance = result['distance']
             threshold = result['threshold']
             embedding_score = max(0, (1 - (distance / threshold)) * 100)
+            geometry_score = 88.0
             
-            # Geometry score (basic from DeepFace facial area)
-            geometry_score = 88.0  # Default high score
-            
-            # Final confidence
             final_confidence = (
                 embedding_score * 0.50 +
                 geometry_score * 0.30 +
@@ -101,29 +99,25 @@ class AdvancedFaceVerification:
             
             match = result['verified'] and final_confidence >= 70
             
+            print(f"✅ Verification complete: {match} (confidence: {final_confidence:.1f}%)")
+            
             return {
                 'match': match,
-                'confidence': round(final_confidence, 1),
-                'reason': 'Verification successful - All checks passed' if match else 'Low confidence match',
+                'confidence': round(final_confidence / 100, 2),
+                'reason': 'Verification successful' if match else 'Low confidence match',
                 'detailed_scores': {
                     'face_embedding_score': f"{embedding_score:.1f}%",
                     'geometry_score': f"{geometry_score:.1f}%",
-                    'liveness_score': 'PASSED ✓' if match else 'N/A',
                     'anti_spoof_score': f"{spoof_result['confidence']:.1f}%",
                     'final_confidence': f"{final_confidence:.1f}%"
-                },
-                'spoof_details': {
-                    'is_real': spoof_result['is_real'],
-                    'indicators': spoof_result['indicators'] if spoof_result['indicators'] else ['None - Real face detected']
                 }
             }
             
         except Exception as e:
+            print(f"❌ DeepFace error: {e}")
             return {
                 'match': False,
                 'confidence': 0,
                 'reason': f'Face not detected: {str(e)}',
                 'detailed_scores': None
             }
-        # //pip install deepface tensorflow
-        # advanced_face verification
