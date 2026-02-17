@@ -45,5 +45,5 @@ def index():
 if __name__ == '__main__':
     # Runs the Flask app in debug mode
     app.run(debug=True, host='0.0.0.0', port=5000)
-    # venv\Scripts\activate
-    # pip install -r requirements.txt
+    #venv\Scripts\activate
+    #pip install -r requirements.txt
