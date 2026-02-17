@@ -172,3 +172,4 @@ class VoterImageValidator:
         except Exception as e:
             # If face detection fails, we'll allow it but warn
             return {"valid": True}
+        # image validator
