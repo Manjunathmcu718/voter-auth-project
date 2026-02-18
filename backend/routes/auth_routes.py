@@ -1,7 +1,9 @@
 from flask import Blueprint, request, jsonify, current_app
 from datetime import datetime, timedelta
 import random
+import base64
 from bson import ObjectId
+import gridfs
 from utils.validation import calculate_age
 from utils.sms import send_sms
 from services.advanced_face_verification import AdvancedFaceVerification
@@ -28,6 +30,37 @@ def authenticate_voter():
     if voter.get('has_voted'):
         voter['_id'] = str(voter['_id'])
         return jsonify({"status": "already_voted", "voter": voter}), 200
+
+    # Perform face verification if live_image_data is provided
+    if data.get('live_image_data'):
+        if not voter.get('image_id'):
+            return jsonify({"error": "No stored photo found for this voter. Please contact admin."}), 400
+        
+        try:
+            fs = gridfs.GridFS(mongo.db)
+            stored_image_file = fs.get(ObjectId(voter['image_id']))
+            
+            # Convert stored image to base64 data URL for comparison
+            stored_image_bytes = stored_image_file.read()
+            stored_image_base64 = base64.b64encode(stored_image_bytes).decode('utf-8')
+            stored_image_data_url = f"data:image/jpeg;base64,{stored_image_base64}"
+            
+            # Perform face verification
+            verifier = AdvancedFaceVerification()
+            # Create a temporary URL-like string that the verifier can use
+            # We'll modify the verifier to handle base64 data URLs directly
+            face_result = verifier.comprehensive_verification(stored_image_data_url, data['live_image_data'])
+            
+            if not face_result.get('match', False):
+                return jsonify({
+                    "error": f"Face verification failed: {face_result.get('reason', 'Face mismatch')}",
+                    "confidence": face_result.get('confidence', 0),
+                    "detailed_scores": face_result.get('detailed_scores')
+                }), 403
+            
+        except Exception as e:
+            print(f"Face verification error: {e}")
+            return jsonify({"error": f"Face verification failed: {str(e)}"}), 500
 
     otp = str(random.randint(100000, 999999))
     expires_at = datetime.utcnow() + timedelta(minutes=5)

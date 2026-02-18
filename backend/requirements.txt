@@ -8,4 +8,5 @@ numpy
 twilio
 Pillow
 opencv-python-headless
-numpy
+deepface
+requests

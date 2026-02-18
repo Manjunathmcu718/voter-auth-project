@@ -57,7 +57,24 @@ export default function VoterAuthPage() {
         }),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Authentication failed');
+      if (!response.ok) {
+        const baseMsg = data?.error || 'Authentication failed';
+        const scoreParts = [];
+
+        if (typeof data?.confidence === 'number') {
+          scoreParts.push(`Confidence: ${(data.confidence * 100).toFixed(0)}%`);
+        }
+        if (data?.detailed_scores) {
+          const ds = data.detailed_scores;
+          if (ds.face_embedding_score) scoreParts.push(`Embedding: ${ds.face_embedding_score}`);
+          if (ds.geometry_score) scoreParts.push(`Geometry: ${ds.geometry_score}`);
+          if (ds.anti_spoof_score) scoreParts.push(`Anti-spoof: ${ds.anti_spoof_score}`);
+          if (ds.final_confidence) scoreParts.push(`Final: ${ds.final_confidence}`);
+        }
+
+        const details = scoreParts.length ? ` (${scoreParts.join(', ')})` : '';
+        throw new Error(`${baseMsg}${details}`);
+      }
 
       if (data.status === 'already_voted') {
         setVoterData(data.voter);
@@ -69,7 +86,8 @@ export default function VoterAuthPage() {
       }
     } catch (err) {
       setError(err.message);
-      setStep(1);
+      // Stay on face step so user can retake quickly
+      setStep('face-verify');
     }
     setIsLoading(false);
   };
