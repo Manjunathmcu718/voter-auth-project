@@ -75,3 +75,29 @@ def get_anomalies():
     for anomaly in anomalies:
         anomaly['_id'] = str(anomaly['_id'])
     return jsonify(anomalies)
+ 
+@data_bp.route("/api/dashboard/stats", methods=["GET"])
+def dashboard_stats():
+
+    total = mongo.db.voters.count_documents({})
+    voted = mongo.db.voters.count_documents({"has_voted": True})
+    not_voted = total - voted
+
+    percentage = 0
+    if total > 0:
+        percentage = round((voted / total) * 100, 2)
+
+    recent_votes = list(
+        mongo.db.voters.find(
+            {"has_voted": True},
+            {"_id": 0}
+        ).sort("voting_timestamp", -1).limit(10)
+    )
+
+    return jsonify({
+        "totalVoters": total,
+        "votedCount": voted,
+        "notVotedCount": not_voted,
+        "votingPercentage": percentage,
+        "recentVotes": recent_votes
+    })

@@ -22,7 +22,15 @@ def authenticate_voter():
     if not voter:
         return jsonify({"error": "Voter not found. Please check your credentials."}), 404
 
-    if calculate_age(voter.get('date_of_birth')) < 18:
+    # Get age from database if available
+    age = voter.get("age")
+
+    # If age not stored, calculate from DOB
+    if age is None:
+        age = calculate_age(voter.get('date_of_birth'))
+
+    # Check eligibility
+    if age < 18:
         return jsonify({"error": "Voter is not eligible to vote (under 18)."}), 403
 
     if voter.get('has_voted'):
@@ -31,18 +39,23 @@ def authenticate_voter():
 
     otp = str(random.randint(100000, 999999))
     expires_at = datetime.utcnow() + timedelta(minutes=5)
-    
-    mongo.db.voters.update_one({"_id": voter['_id']}, {"$set": {"otp_code": otp, "otp_expires_at": expires_at}})
-    
-    send_sms(voter['phone_number'], f"Your Voter Authentication OTP is {otp}. It is valid for 5 minutes.")
-    
+
+    mongo.db.voters.update_one(
+        {"_id": voter['_id']},
+        {"$set": {"otp_code": otp, "otp_expires_at": expires_at}}
+    )
+
+    send_sms(
+        voter['phone_number'],
+        f"Your Voter Authentication OTP is {otp}. It is valid for 5 minutes."
+    )
+
     return jsonify({
         "status": "otp_sent",
         "voter_id": str(voter['_id']),
         "message": f"OTP sent to mobile ending in ******{voter['phone_number'][-4:]}",
         "otp_for_testing": otp
     })
-
 @auth_bp.route('/verify-otp', methods=['POST'])
 def verify_otp():
     data = request.json

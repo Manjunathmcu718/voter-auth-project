@@ -1,3 +1,5 @@
+from routes.data_routes import data_bp
+from routes.anomaly_routes import anomaly_bp
 from flask import Flask
 from flask_cors import CORS
 from flask_pymongo import PyMongo
@@ -10,7 +12,6 @@ load_dotenv()
 # Import blueprints from the routes package
 from routes.auth_routes import auth_bp
 from routes.admin_routes import admin_bp
-from routes.data_routes import data_bp
 from routes.gov_verify_routes import gov_verify_bp
 from routes.image_routes import image_bp
 from routes.booth_allocation import booth_allocation_bp
@@ -35,6 +36,8 @@ app.register_blueprint(data_bp, url_prefix='/api') # For dashboard and AI routes
 app.register_blueprint(gov_verify_bp, url_prefix='/api/auth')
 app.register_blueprint(image_bp, url_prefix='/api/admin')
 app.register_blueprint(booth_allocation_bp, url_prefix='/api/booth-allocation') 
+app.register_blueprint(anomaly_bp, url_prefix="/api")
+# app.register_blueprint(data_bp)
 #Root Route 
 @app.route('/')
 def index():
