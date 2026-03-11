@@ -1,14 +1,20 @@
 import React, { useState, useEffect } from "react";
-import { Voter } from "@/entities/Voter";
+// import { Voter } from "../entities/Voter";
 import { motion, AnimatePresence } from "framer-motion";
-import { Shield, Phone, CheckCircle, Vote } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
+import { Shield, Phone, CheckCircle, Vote, Database } from "lucide-react";
+// import { Alert, AlertDescription } from "../components/ui/alert";
+// import { AlertCircle } from "lucide-react";
+
 
 
 import AuthForm from "../components/voter/AuthForm";
 import OTPVerification from "../components/voter/OTPVerification";
 import VotingStatus from "../components/voter/VotingStatus";
+// import AuthForm from '../components/voter/AuthForm';
+// import OTPVerification from '../components/voter/OTPVerification';
+// import VotingStatus from '../components/voter/VotingStatus';
+import GovernmentVerification from '../components/voter/GovernmentVerification';
+import FaceVerification from '../components/voter/FaceVerification';
 
 // In-memory storage for fake voters' voting status
 const fakeVoterStorage = {};
@@ -66,15 +72,16 @@ const generateFakeData = {
 export default function VoterAuthPage() {
   const [step, setStep] = useState(1); // 1: Auth, 2: OTP, 3: Status
 
-import AuthForm from '../components/voter/AuthForm';
-import OTPVerification from '../components/voter/OTPVerification';
-import VotingStatus from '../components/voter/VotingStatus';
-import GovernmentVerification from '../components/voter/GovernmentVerification';
-import FaceVerification from '../components/voter/FaceVerification';
+// import AuthForm from '../components/voter/AuthForm';
+// import OTPVerification from '../components/voter/OTPVerification';
+// import VotingStatus from '../components/voter/VotingStatus';
+// import GovernmentVerification from '../components/voter/GovernmentVerification';
+// import FaceVerification from '../components/voter/FaceVerification';
 
-export default function VoterAuthPage() {
-  const [step, setStep] = useState(1); 
-
+// export default function VoterAuthPage() {
+  // const [step, setStep] = useState(1); 
+  const [voterIdForOTP, setVoterIdForOTP] = useState(null);
+const [otpForTesting, setOtpForTesting] = useState(null);
   const [voterData, setVoterData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -147,138 +154,138 @@ export default function VoterAuthPage() {
     return Math.floor(100000 + Math.random() * 900000).toString();
   };
 
-  const handleAuthSubmit = async (formData) => {
-    setIsLoading(true);
-    setError("");
-    
-    try {
-      let voter = null;
-      let isFromFakeList = false;
+  // const handleAuthSubmit = async (formData) => {
+  //   setIsLoading(true);
+  //   setError("");
 
-      // ✅ STEP 1: Check FAKER-GENERATED VOTERS first
-      const fakeVoter = fakeVoters.find(v => 
-        v.voter_id === formData.voter_id &&
-        v.aadhar_number === formData.aadhar_number &&
-        v.phone_number === formData.phone_number
-      );
+  //   try {
+  //     let voter = null;
+  //     let isFromFakeList = false;
 
-      if (fakeVoter) {
-        // Use fake voter data
-        voter = { ...fakeVoter };
-        isFromFakeList = true;
+  //     // ✅ STEP 1: Check FAKER-GENERATED VOTERS first
+  //     const fakeVoter = fakeVoters.find(v => 
+  //       v.voter_id === formData.voter_id &&
+  //       v.aadhar_number === formData.aadhar_number &&
+  //       v.phone_number === formData.phone_number
+  //     );
+
+  //     if (fakeVoter) {
+  //       // Use fake voter data
+  //       voter = { ...fakeVoter };
+  //       isFromFakeList = true;
         
-        // Check if this fake voter has voted (from memory)
-        if (fakeVoterStorage[voter.id]?.has_voted) {
-          voter.has_voted = true;
-          voter.voting_timestamp = fakeVoterStorage[voter.id].voting_timestamp;
-        }
+  //       // Check if this fake voter has voted (from memory)
+  //       if (fakeVoterStorage[voter.id]?.has_voted) {
+  //         voter.has_voted = true;
+  //         voter.voting_timestamp = fakeVoterStorage[voter.id].voting_timestamp;
+  //       }
         
-        console.log("✅ Authenticated with GENERATED FAKE VOTER:", voter.full_name);
-      } else {
-        // ✅ STEP 2: If not in fake list, check DATABASE
-        const voters = await Voter.filter({
-          voter_id: formData.voter_id,
-          aadhar_number: formData.aadhar_number,
-          phone_number: formData.phone_number
-        });
+  //       console.log("✅ Authenticated with GENERATED FAKE VOTER:", voter.full_name);
+  //     } else {
+  //       // ✅ STEP 2: If not in fake list, check DATABASE
+  //       const voters = await Voter.filter({
+  //         voter_id: formData.voter_id,
+  //         aadhar_number: formData.aadhar_number,
+  //         phone_number: formData.phone_number
+  //       });
 
-        if (voters.length === 0) {
-          setError("Voter not found. Please check your credentials (Voter ID, Aadhar, and Phone must ALL match).");
-          setIsLoading(false);
-          return;
-        }
+  //       if (voters.length === 0) {
+  //         setError("Voter not found. Please check your credentials (Voter ID, Aadhar, and Phone must ALL match).");
+  //         setIsLoading(false);
+  //         return;
+  //       }
         
-        voter = voters[0];
-        isFromFakeList = false;
-        console.log("✅ Authenticated with DATABASE:", voter.full_name);
-      }
+  //       voter = voters[0];
+  //       isFromFakeList = false;
+  //       console.log("✅ Authenticated with DATABASE:", voter.full_name);
+  //     }
 
-      // Check age eligibility
-      const age = calculateAge(voter.date_of_birth);
-      if (age < 18) {
-          setError(`Voter is only ${age} years old and is not eligible to vote.`);
-          setIsLoading(false);
-          return;
-      }
+  //     // Check age eligibility
+  //     const age = calculateAge(voter.date_of_birth);
+  //     if (age < 18) {
+  //         setError(`Voter is only ${age} years old and is not eligible to vote.`);
+  //         setIsLoading(false);
+  //         return;
+  //     }
 
-      // If already voted, go directly to status
-      if (voter.has_voted) {
-          setVoterData(voter);
-          setIsFakeVoter(isFromFakeList);
-          setStep(3);
-          setIsLoading(false);
-          return;
-      }
+  //     // If already voted, go directly to status
+  //     if (voter.has_voted) {
+  //         setVoterData(voter);
+  //         setIsFakeVoter(isFromFakeList);
+  //         setStep(3);
+  //         setIsLoading(false);
+  //         return;
+  //     }
 
-      // Generate OTP
-      const otp = generateNewOTP();
-      const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+  //     // Generate OTP
+  //     const otp = generateNewOTP();
+  //     const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
 
-      // Update voter with OTP
-      if (isFromFakeList) {
-        // Store in memory for fake voters
-        voter.otp_code = otp;
-        voter.otp_expires_at = expiresAt;
-      } else {
-        // Update in database for real voters
-        await Voter.update(voter.id, { 
-          ...voter,
-          otp_code: otp, 
-          otp_expires_at: expiresAt 
-        });
-      }
+  //     // Update voter with OTP
+  //     if (isFromFakeList) {
+  //       // Store in memory for fake voters
+  //       voter.otp_code = otp;
+  //       voter.otp_expires_at = expiresAt;
+  //     } else {
+  //       // Update in database for real voters
+  //       await Voter.update(voter.id, { 
+  //         ...voter,
+  //         otp_code: otp, 
+  //         otp_expires_at: expiresAt 
+  //       });
+  //     }
       
-      setVoterData({ 
-        ...voter, 
-        otp_code: otp, 
-        otp_expires_at: expiresAt 
-      });
-      setIsFakeVoter(isFromFakeList);
-      setStep(2);
-    } catch (err) {
-      console.error("Authentication error:", err);
-      setError("Authentication failed. Please try again.");
-    }
-    setIsLoading(false);
-  };
+  //     setVoterData({ 
+  //       ...voter, 
+  //       otp_code: otp, 
+  //       otp_expires_at: expiresAt 
+  //     });
+  //     setIsFakeVoter(isFromFakeList);
+  //     setStep(2);
+  //   } catch (err) {
+  //     console.error("Authentication error:", err);
+  //     setError("Authentication failed. Please try again.");
+  //   }
+  //   setIsLoading(false);
+  // };
 
-  const handleOTPVerify = async (enteredOTP) => {
-    setIsLoading(true);
-    setError("");
-    try {
-      if (!voterData) {
-        setError("No voter data found. Please start authentication again.");
-        setStep(1);
-        setIsLoading(false);
-        return;
-      }
-      if (new Date() > new Date(voterData.otp_expires_at)) {
-        setError("OTP has expired. Please authenticate again.");
-        setStep(1);
-        setIsLoading(false);
-        return;
-      }
-      if (enteredOTP !== voterData.otp_code) {
-        setError("Invalid OTP. Please try again.");
-        setIsLoading(false);
-        return;
-      }
+  // const handleOTPVerify = async (enteredOTP) => {
+  //   setIsLoading(true);
+  //   setError("");
+  //   try {
+  //     if (!voterData) {
+  //       setError("No voter data found. Please start authentication again.");
+  //       setStep(1);
+  //       setIsLoading(false);
+  //       return;
+  //     }
+  //     if (new Date() > new Date(voterData.otp_expires_at)) {
+  //       setError("OTP has expired. Please authenticate again.");
+  //       setStep(1);
+  //       setIsLoading(false);
+  //       return;
+  //     }
+  //     if (enteredOTP !== voterData.otp_code) {
+  //       setError("Invalid OTP. Please try again.");
+  //       setIsLoading(false);
+  //       return;
+  //     }
       
-      // OTP verified successfully
-      if (isFakeVoter) {
-        // For fake voters, keep current data
-        setStep(3);
-      } else {
-        // For real voters, re-fetch from database
-        setVoterData(await Voter.get(voterData.id));
-        setStep(3);
-      }
-    } catch (err) {
-      console.error("Verification error:", err);
-      setError("Verification failed. Please try again.");
-    }
-    setIsLoading(false);
-  };
+  //     // OTP verified successfully
+  //     if (isFakeVoter) {
+  //       // For fake voters, keep current data
+  //       setStep(3);
+  //     } else {
+  //       // For real voters, re-fetch from database
+  //       setVoterData(await Voter.get(voterData.id));
+  //       setStep(3);
+  //     }
+  //   } catch (err) {
+  //     console.error("Verification error:", err);
+  //     setError("Verification failed. Please try again.");
+  //   }
+  //   setIsLoading(false);
+  // };
 
   const handleResendOTP = async () => {
     if (!voterData) {
@@ -297,14 +304,17 @@ export default function VoterAuthPage() {
         // Update in memory for fake voters
         voterData.otp_code = newOTP;
         voterData.otp_expires_at = newExpiresAt;
+      // } else {
+      //   // Update in database for real voters
+      //   await Voter.update(voterData.id, { 
+      //     ...voterData,
+      //     otp_code: newOTP, 
+      //     otp_expires_at: newExpiresAt 
+      //   });
+      // }
       } else {
-        // Update in database for real voters
-        await Voter.update(voterData.id, { 
-          ...voterData,
-          otp_code: newOTP, 
-          otp_expires_at: newExpiresAt 
-        });
-      }
+  // Backend handles OTP now
+}
       
       setVoterData(prev => ({
         ...prev,
@@ -320,46 +330,46 @@ export default function VoterAuthPage() {
     setIsLoading(false);
   };
 
-  const handleVoteAction = async () => {
-    setIsLoading(true);
-    setError("");
-    try {
-      if (!voterData || voterData.has_voted) {
-        setError("Cannot vote. Voter data missing or already voted.");
-        setIsLoading(false);
-        return;
-      }
+  // const handleVoteAction = async () => {
+  //   setIsLoading(true);
+  //   setError("");
+  //   try {
+  //     if (!voterData || voterData.has_voted) {
+  //       setError("Cannot vote. Voter data missing or already voted.");
+  //       setIsLoading(false);
+  //       return;
+  //     }
       
-      const votingTimestamp = new Date().toISOString();
+  //     const votingTimestamp = new Date().toISOString();
       
-      if (isFakeVoter) {
-        // Store in memory for fake voters
-        fakeVoterStorage[voterData.id] = {
-          has_voted: true,
-          voting_timestamp: votingTimestamp
-        };
-        setVoterData(prev => ({
-          ...prev,
-          has_voted: true,
-          voting_timestamp: votingTimestamp
-        }));
-      } else {
-        // Update in database for real voters
-        const updatedVoter = await Voter.update(voterData.id, {
-          ...voterData,
-          has_voted: true,
-          voting_timestamp: votingTimestamp
-        });
-        setVoterData(updatedVoter);
-      }
-    } catch (err) {
-      console.error("Vote action error:", err);
-      setError("Failed to update voting status. Please try again.");
-    }
-    setIsLoading(false);
-  };
+  //     if (isFakeVoter) {
+  //       // Store in memory for fake voters
+  //       fakeVoterStorage[voterData.id] = {
+  //         has_voted: true,
+  //         voting_timestamp: votingTimestamp
+  //       };
+  //       setVoterData(prev => ({
+  //         ...prev,
+  //         has_voted: true,
+  //         voting_timestamp: votingTimestamp
+  //       }));
+  //     } else {
+  //       // Update in database for real voters
+  //       const updatedVoter = await Voter.update(voterData.id, {
+  //         ...voterData,
+  //         has_voted: true,
+  //         voting_timestamp: votingTimestamp
+  //       });
+  //       setVoterData(updatedVoter);
+  //     }
+  //   } catch (err) {
+  //     console.error("Vote action error:", err);
+  //     setError("Failed to update voting status. Please try again.");
+  //   }
+  //   setIsLoading(false);
+  // };
 
-  const [error, setError] = useState('');
+  // const [error, setError] = useState('');
   const [formDataForGov, setFormDataForGov] = useState(null);
 
 
@@ -372,10 +382,10 @@ export default function VoterAuthPage() {
   };
 
 
-  const progressSteps = [
-    { id: 1, name: "Authenticate", icon: Shield },
-    { id: 2, name: "Verify OTP", icon: Phone },
-    { id: 3, name: "Status", icon: Vote },
+  // const progressSteps = [
+  //   { id: 1, name: "Authenticate", icon: Shield },
+  //   { id: 2, name: "Verify OTP", icon: Phone },
+  //   { id: 3, name: "Status", icon: Vote },
 
   // Step 1: User submits details -> Government verification
   const handleAuthSubmit = (formData) => {
@@ -541,13 +551,17 @@ export default function VoterAuthPage() {
               transition={{ delay: 0.2 }}
               className="mt-6 max-w-xl mx-auto"
             >
-              <Alert className="bg-blue-50 border-blue-200">
+              {/* <Alert className="bg-blue-50 border-blue-200">
                 <AlertCircle className="h-4 w-4 text-blue-600" />
                 <AlertDescription className="text-sm text-blue-800">
                   <strong>Testing Mode:</strong> {fakeVoters.length} fake voters generated automatically. 
                   <br />Check browser console (F12) for test credentials.
                 </AlertDescription>
-              </Alert>
+              </Alert> */
+              <div className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded-lg text-sm">
+  <strong>Testing Mode:</strong> {fakeVoters.length} fake voters generated automatically.
+  <br />Check browser console (F12) for test credentials.
+</div>}
             </motion.div>
           )}
         </header>
@@ -557,7 +571,7 @@ export default function VoterAuthPage() {
             {progressSteps.map((item, index) => (
               <React.Fragment key={item.id}>
                 <div className="flex flex-col items-center">
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center font-semibold transition-all duration-300 ${
+                  /* <div className={`w-12 h-12 rounded-full flex items-center justify-center font-semibold transition-all duration-300 ${
 
                     item.id <= step 
                       ? "bg-gradient-to-br from-orange-500 to-green-500 text-white shadow-lg" 
@@ -575,17 +589,37 @@ export default function VoterAuthPage() {
                       <item.icon className="w-6 h-6" />
                     )}
 
-                  </div>
+                  </div> */
+                  <div
+  className={`w-12 h-12 rounded-full flex items-center justify-center font-semibold transition-all duration-300 ${
+    isStepActive(item.id)
+      ? "bg-gradient-to-br from-orange-500 to-green-500 text-white shadow-lg"
+      : "bg-gray-200 text-gray-500"
+  }`}
+>
+  {step === 3 && item.id !== 3 ? (
+    <CheckCircle className="w-6 h-6" />
+  ) : (
+    <item.icon className="w-6 h-6" />
+  )}
+</div>
                   <span className="text-sm text-gray-600 mt-2 hidden sm:block">{item.name}</span>
                 </div>
                 {index < progressSteps.length - 1 && (
-                  <div className={`flex-1 h-1 transition-all duration-300 max-w-24 ${
+                  // <div className={`flex-1 h-1 transition-all duration-300 max-w-24 ${
 
-                    item.id < step ? "bg-gradient-to-r from-orange-500 to-green-500" : "bg-gray-200"
+                  //   item.id < step ? "bg-gradient-to-r from-orange-500 to-green-500" : "bg-gray-200"
 
-                    isStepActive(item.id) ? "bg-gradient-to-r from-orange-500 to-green-500" : "bg-gray-200"
+                  //   isStepActive(item.id) ? "bg-gradient-to-r from-orange-500 to-green-500" : "bg-gray-200"
 
-                  }`} />
+                  // }`} />
+                  <div
+  className={`flex-1 h-1 transition-all duration-300 max-w-24 ${
+    isStepActive(item.id)
+      ? "bg-gradient-to-r from-orange-500 to-green-500"
+      : "bg-gray-200"
+  }`}
+/>
                 )}
               </React.Fragment>
             ))}
@@ -596,10 +630,10 @@ export default function VoterAuthPage() {
           {error && (
             <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="mb-6 max-w-md mx-auto">
 
-              <Alert variant="destructive">
+              {/* <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>{error}</AlertDescription>
-              </Alert>
+              </Alert> */}
 
               <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg">
                 {error}
@@ -611,10 +645,10 @@ export default function VoterAuthPage() {
 
         <AnimatePresence mode="wait">
 
-          {step === 1 && <AuthForm key="auth" onSubmit={handleAuthSubmit} isLoading={isLoading} />}
+          {/* {step === 1 && <AuthForm key="auth" onSubmit={handleAuthSubmit} isLoading={isLoading} />}
           {step === 2 && (
             <OTPVerification 
-              key="otp" 
+              key="otp"  */}
 
           {step === 1 && (
             <AuthForm 
@@ -656,19 +690,21 @@ export default function VoterAuthPage() {
               key="status" 
 
               voterData={voterData} 
-              onVerify={handleOTPVerify} 
-              onBack={() => setStep(1)} 
-              onResendOTP={handleResendOTP}
+              // onVerify={handleOTPVerify} 
+              // onBack={() => setStep(1)} 
+              // onResendOTP={handleResendOTP}
+              onVote={handleVoteAction}
+onReset={resetFlow}
               isLoading={isLoading} 
             />
           )}
-          {step === 3 && <VotingStatus key="status" voterData={voterData} onVote={handleVoteAction} onReset={resetFlow} isLoading={isLoading} />}
-        </AnimatePresence>
+        
+          </AnimatePresence>
       </div>
     </div>
   );
-
-}// import React, { useState } from 'react';
+}
+// import React, { useState } from 'react';
 // import { motion, AnimatePresence } from 'framer-motion';
 // import { Shield, Phone, CheckCircle, Vote, Database } from 'lucide-react';
 
@@ -1179,12 +1215,12 @@ export default function VoterAuthPage() {
 //     </div>
 //   );
 // }
-=======
-}
+// =======
+// }
 
 
 
->>>>>>> 5171cff19f22c571dcbbc1ec083688905b94def8
+// >>>>>>> 5171cff19f22c571dcbbc1ec083688905b94def8
 // import React, { useState } from 'react';
 // import { motion, AnimatePresence } from 'framer-motion';
 // import { Shield, Phone, CheckCircle, Vote, Database } from 'lucide-react';
